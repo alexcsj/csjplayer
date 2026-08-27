@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=csjplayer
+Comment=以 FFmpeg (libmpv) 為核心的影音播放器
+Exec=csjplayer %f
+Icon=csjplayer
+Terminal=false
+StartupWMClass=csjplayer
+Categories=AudioVideo;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;audio/mpeg;audio/flac;audio/x-wav;
