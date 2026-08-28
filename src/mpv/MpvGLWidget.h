@@ -38,6 +38,9 @@ signals:
     // the actual showFullScreen()/showNormal() in response to this.
     void fullscreenToggleRequested();
 
+    // Right-click menu's "顯示媒體內容" action.
+    void mediaInfoRequested();
+
 protected:
     void initializeGL() override;
     void paintGL() override;
@@ -45,6 +48,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
 
 private:
     Qt::Edges edgesAt(const QPoint &localPos) const;

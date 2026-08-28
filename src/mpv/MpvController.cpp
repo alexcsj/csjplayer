@@ -3,9 +3,11 @@
 #include <QDebug>
 #include <QMetaObject>
 #include <QByteArray>
+#include <QStringList>
 
 #include <algorithm>
 #include <clocale>
+#include <cstdint>
 #include <stdexcept>
 
 namespace {
@@ -16,6 +18,27 @@ void checkError(int status, const char *what) {
     if (status < 0) {
         qWarning() << "mpv error in" << what << ":" << mpv_error_string(status);
     }
+}
+
+QString formatDurationHMS(double seconds) {
+    if (seconds < 0) {
+        return QStringLiteral("—");
+    }
+    const int total = static_cast<int>(seconds);
+    const int h = total / 3600;
+    const int m = (total % 3600) / 60;
+    const int s = total % 60;
+    if (h > 0) {
+        return QStringLiteral("%1:%2:%3").arg(h).arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
+    }
+    return QStringLiteral("%1:%2").arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
+}
+
+QString formatBitrate(int64_t bitsPerSecond) {
+    if (bitsPerSecond <= 0) {
+        return QStringLiteral("—");
+    }
+    return QStringLiteral("%1 kbps").arg(bitsPerSecond / 1000);
 }
 
 } // namespace
@@ -236,6 +259,59 @@ bool MpvController::isPaused() const {
     int flag = 0;
     mpv_get_property(mpv_, "pause", MPV_FORMAT_FLAG, &flag);
     return flag != 0;
+}
+
+QString MpvController::mediaInfoText() const {
+    auto getStr = [this](const char *name) -> QString {
+        char *raw = mpv_get_property_string(mpv_, name);
+        if (!raw) {
+            return QStringLiteral("—");
+        }
+        QString result = QString::fromUtf8(raw);
+        mpv_free(raw);
+        return result.isEmpty() ? QStringLiteral("—") : result;
+    };
+    auto getDouble = [this](const char *name) -> double {
+        double v = -1.0;
+        mpv_get_property(mpv_, name, MPV_FORMAT_DOUBLE, &v);
+        return v;
+    };
+    auto getInt = [this](const char *name) -> int64_t {
+        int64_t v = 0;
+        return mpv_get_property(mpv_, name, MPV_FORMAT_INT64, &v) >= 0 ? v : -1;
+    };
+
+    const int64_t width = getInt("dwidth");
+    const int64_t height = getInt("dheight");
+    const double fps = getDouble("container-fps");
+    const double duration = getDouble("duration");
+    const int64_t videoBitrate = getInt("video-bitrate");
+    const int64_t sampleRate = getInt("audio-params/samplerate");
+    const int64_t channels = getInt("audio-params/channel-count");
+    const int64_t audioBitrate = getInt("audio-bitrate");
+
+    QStringList lines;
+    lines << QStringLiteral("檔案名稱: %1").arg(getStr("filename"));
+    lines << QStringLiteral("容器格式: %1").arg(getStr("file-format"));
+    lines << QStringLiteral("時長: %1").arg(formatDurationHMS(duration));
+    lines << QString();
+    lines << QStringLiteral("── 影像 ──");
+    lines << QStringLiteral("解析度: %1").arg(width > 0 && height > 0
+                                                    ? QStringLiteral("%1 x %2").arg(width).arg(height)
+                                                    : QStringLiteral("—"));
+    lines << QStringLiteral("編碼格式: %1").arg(getStr("video-codec"));
+    lines << QStringLiteral("影格率: %1")
+                 .arg(fps > 0 ? QStringLiteral("%1 fps").arg(fps, 0, 'f', 2) : QStringLiteral("—"));
+    lines << QStringLiteral("位元率: %1").arg(formatBitrate(videoBitrate));
+    lines << QString();
+    lines << QStringLiteral("── 音訊 ──");
+    lines << QStringLiteral("編碼格式: %1").arg(getStr("audio-codec"));
+    lines << QStringLiteral("取樣率: %1")
+                 .arg(sampleRate > 0 ? QStringLiteral("%1 Hz").arg(sampleRate) : QStringLiteral("—"));
+    lines << QStringLiteral("聲道數: %1").arg(channels > 0 ? QString::number(channels) : QStringLiteral("—"));
+    lines << QStringLiteral("位元率: %1").arg(formatBitrate(audioBitrate));
+
+    return lines.join(QLatin1Char('\n'));
 }
 
 // Fires on an mpv-internal render thread. Must stay minimal: no mpv_* calls,

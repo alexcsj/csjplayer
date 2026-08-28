@@ -14,6 +14,7 @@
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QResizeEvent>
 #include <QScreen>
@@ -378,6 +379,7 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
         }
     };
     connect(mpvWidget_, &MpvGLWidget::fullscreenToggleRequested, this, toggleFullscreen);
+    connect(mpvWidget_, &MpvGLWidget::mediaInfoRequested, this, &PlayerWindow::showMediaInfo);
 
     auto *fullscreenShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);
     fullscreenShortcut->setContext(Qt::WindowShortcut);
@@ -503,6 +505,10 @@ void PlayerWindow::toggleMaximizeRestore() {
         showMaximized();
     }
     titleBar_->setMaximized(isMaximized());
+}
+
+void PlayerWindow::showMediaInfo() {
+    QMessageBox::information(this, QStringLiteral("媒體內容"), mpvController_->mediaInfoText());
 }
 
 void PlayerWindow::resizeToPreset(const QSize &size) {

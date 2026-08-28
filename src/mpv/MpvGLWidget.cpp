@@ -1,9 +1,12 @@
 #include "mpv/MpvGLWidget.h"
 #include "mpv/MpvController.h"
 
+#include <QAction>
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QCursor>
 #include <QDebug>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QOpenGLContext>
 #include <QWindow>
@@ -172,6 +175,13 @@ void MpvGLWidget::mouseDoubleClickEvent(QMouseEvent *event) {
         return;
     }
     QOpenGLWidget::mouseDoubleClickEvent(event);
+}
+
+void MpvGLWidget::contextMenuEvent(QContextMenuEvent *event) {
+    QMenu menu(this);
+    QAction *infoAction = menu.addAction(QStringLiteral("顯示媒體內容"));
+    connect(infoAction, &QAction::triggered, this, &MpvGLWidget::mediaInfoRequested);
+    menu.exec(event->globalPos());
 }
 
 // mpv's own OpenGL renderer already letterboxes/pillarboxes the video to

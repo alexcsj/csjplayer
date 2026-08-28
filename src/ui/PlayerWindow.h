@@ -72,6 +72,9 @@ private:
     // workaround needed).
     void resizeToPreset(const QSize &size);
 
+    // Right-click context menu's "顯示媒體內容" action.
+    void showMediaInfo();
+
     MpvController *mpvController_ = nullptr;
     MpvGLWidget *mpvWidget_ = nullptr;
     TitleBar *titleBar_ = nullptr;

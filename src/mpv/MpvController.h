@@ -69,6 +69,10 @@ public:
     // Synchronous query, safe to call anytime from the GUI thread.
     bool isPaused() const;
 
+    // Human-readable, multi-line media info (container, resolution, codecs,
+    // fps, bitrates, ...) for the right-click "顯示媒體內容" menu action.
+    QString mediaInfoText() const;
+
 signals:
     // Emitted (GUI thread) whenever mpv has a new frame ready to present.
     void frameReady();
