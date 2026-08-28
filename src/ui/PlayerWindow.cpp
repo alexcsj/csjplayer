@@ -9,6 +9,7 @@
 #include "ui/TitleBar.h"
 #include "ui/TransportBar.h"
 
+#include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
@@ -16,7 +17,10 @@
 #include <QMimeData>
 #include <QResizeEvent>
 #include <QScreen>
+#include <QSettings>
 #include <QShortcut>
+#include <QStandardPaths>
+#include <QUrl>
 #include <QWheelEvent>
 
 #include <algorithm>
@@ -37,6 +41,53 @@ QString buildMediaFileDialogFilter() {
         "Media Files (*.mp4 *.mkv *.avi *.mov *.webm *.flv *.wmv *.mp3 *.flac *.wav *.m4a);;All Files (*)");
 }
 
+// Qt's own (non-native) file dialog only pre-populates the sidebar with the
+// filesystem root and the user's home directory unless told otherwise --
+// seed it with the common XDG user directories too, matching what a native
+// file manager's sidebar usually offers. Only used the very first time
+// (before anything has been persisted via QSettings).
+QList<QUrl> defaultSidebarUrls() {
+    QList<QUrl> urls;
+    const auto addIfExists = [&](const QString &path) {
+        if (!path.isEmpty() && QDir(path).exists()) {
+            urls << QUrl::fromLocalFile(path);
+        }
+    };
+    addIfExists(QDir::homePath());
+    addIfExists(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+    addIfExists(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
+    addIfExists(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
+    addIfExists(QStandardPaths::writableLocation(QStandardPaths::MoviesLocation));
+    addIfExists(QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
+    addIfExists(QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+    addIfExists(QDir::rootPath());
+    return urls;
+}
+
+constexpr const char *kSidebarUrlsSettingsKey = "fileDialog/sidebarUrls";
+
+QList<QUrl> loadSidebarUrls() {
+    const QStringList saved = QSettings().value(QLatin1String(kSidebarUrlsSettingsKey)).toStringList();
+    if (saved.isEmpty()) {
+        return defaultSidebarUrls();
+    }
+    QList<QUrl> urls;
+    urls.reserve(saved.size());
+    for (const QString &s : saved) {
+        urls << QUrl(s);
+    }
+    return urls;
+}
+
+void saveSidebarUrls(const QList<QUrl> &urls) {
+    QStringList list;
+    list.reserve(urls.size());
+    for (const QUrl &url : urls) {
+        list << url.toString();
+    }
+    QSettings().setValue(QLatin1String(kSidebarUrlsSettingsKey), list);
+}
+
 // Shared sizing/behavior for every file dialog in the app (open files, add
 // folder, export/import playlist), so they all look and resize the same way
 // instead of whatever default a given static QFileDialog convenience
@@ -50,6 +101,22 @@ void prepareFileDialog(QFileDialog &dialog) {
     // non-shrinkable size the way getExistingDirectory's default used to.
     dialog.setMinimumSize(480, 360);
     dialog.resize(700, 450);
+    dialog.setSidebarUrls(loadSidebarUrls());
+}
+
+// Qt's own file dialog sidebar already supports right-click "remove" and
+// drag-and-drop "add" -- but since we construct a brand-new QFileDialog
+// every time, those in-session edits were silently lost the moment the
+// dialog closed (removals looked like they "worked" only because the
+// change was visible while that one dialog was still open; additions never
+// appeared to work at all since the next dialog reset back to the
+// hardcoded defaults). Persisting sidebarUrls() after every exec() call --
+// regardless of whether the user picked a file or cancelled -- makes both
+// stick permanently.
+int execFileDialog(QFileDialog &dialog) {
+    const int result = dialog.exec();
+    saveSidebarUrls(dialog.sidebarUrls());
+    return result;
 }
 
 QString repeatModeLabel(PlaylistController::RepeatMode mode) {
@@ -180,6 +247,7 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(mpvController_, &MpvController::volumeChanged, transportBar_, &TransportBar::setVolume);
     connect(mpvController_, &MpvController::mutedChanged, transportBar_, &TransportBar::setMuted);
     connect(transportBar_, &TransportBar::muteToggleClicked, mpvController_, &MpvController::toggleMute);
+    connect(mpvController_, &MpvController::loopMarkersChanged, transportBar_, &TransportBar::setLoopMarkers);
 
     // F8 speed/direction wiring.
     connect(transportBar_, &TransportBar::speedMagnitudeSelected, speedController_, &SpeedController::setMagnitude);
@@ -203,6 +271,11 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
             [this](int) { transportBar_->setPlaylistNavigationEnabled(true); });
     connect(playlistController_, &PlaylistController::currentIndexChanged, speedController_,
             &SpeedController::resetToForwardNormal);
+    // A-B loop points are mpv playback settings, not tied to any one file --
+    // without this, switching tracks kept looping the new file over the old
+    // file's (likely nonsensical) A-B range.
+    connect(playlistController_, &PlaylistController::currentIndexChanged, mpvController_,
+            &MpvController::clearLoop);
     connect(playlistController_, &PlaylistController::repeatModeChanged, this, [this](PlaylistController::RepeatMode) {
         updateRepeatModeLabel();
     });
@@ -335,7 +408,7 @@ QStringList PlayerWindow::runOpenFilesDialog() {
     dialog.setAcceptMode(QFileDialog::AcceptOpen);
     prepareFileDialog(dialog);
 
-    const QStringList paths = dialog.exec() == QDialog::Accepted ? dialog.selectedFiles() : QStringList();
+    const QStringList paths = execFileDialog(dialog) == QDialog::Accepted ? dialog.selectedFiles() : QStringList();
     if (paths.isEmpty()) {
         mpvController_->setPaused(wasPaused);
     }
@@ -363,7 +436,7 @@ void PlayerWindow::exportPlaylistDialog() {
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     prepareFileDialog(dialog);
 
-    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+    if (execFileDialog(dialog) == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
         playlistController_->exportToFile(dialog.selectedFiles().first());
     }
 }
@@ -375,7 +448,7 @@ void PlayerWindow::importPlaylistDialog() {
     dialog.setAcceptMode(QFileDialog::AcceptOpen);
     prepareFileDialog(dialog);
 
-    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+    if (execFileDialog(dialog) == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
         playlistController_->importFromFile(dialog.selectedFiles().first());
     }
 }
@@ -390,7 +463,7 @@ void PlayerWindow::openFolderDialog() {
     prepareFileDialog(dialog);
 
     QString dir;
-    if (dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
+    if (execFileDialog(dialog) == QDialog::Accepted && !dialog.selectedFiles().isEmpty()) {
         dir = dialog.selectedFiles().first();
     }
     if (!dir.isEmpty()) {

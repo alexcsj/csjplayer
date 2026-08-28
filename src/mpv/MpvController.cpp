@@ -194,21 +194,42 @@ void MpvController::setPlayDirectionBackward(bool backward) {
 
 void MpvController::setLoopA() {
     double pos = 0;
-    if (mpv_get_property(mpv_, "time-pos", MPV_FORMAT_DOUBLE, &pos) >= 0) {
-        checkError(mpv_set_property(mpv_, "ab-loop-a", MPV_FORMAT_DOUBLE, &pos), "set ab-loop-a");
+    if (mpv_get_property(mpv_, "time-pos", MPV_FORMAT_DOUBLE, &pos) < 0) {
+        return;
     }
+    checkError(mpv_set_property(mpv_, "ab-loop-a", MPV_FORMAT_DOUBLE, &pos), "set ab-loop-a");
+    loopAExplicitPos_ = pos;
+
+    if (!loopBExplicitPos_.has_value()) {
+        double duration = 0;
+        if (mpv_get_property(mpv_, "duration", MPV_FORMAT_DOUBLE, &duration) >= 0 && duration > 0) {
+            mpv_set_property(mpv_, "ab-loop-b", MPV_FORMAT_DOUBLE, &duration);
+        }
+    }
+    emit loopMarkersChanged(loopAExplicitPos_, loopBExplicitPos_);
 }
 
 void MpvController::setLoopB() {
     double pos = 0;
-    if (mpv_get_property(mpv_, "time-pos", MPV_FORMAT_DOUBLE, &pos) >= 0) {
-        checkError(mpv_set_property(mpv_, "ab-loop-b", MPV_FORMAT_DOUBLE, &pos), "set ab-loop-b");
+    if (mpv_get_property(mpv_, "time-pos", MPV_FORMAT_DOUBLE, &pos) < 0) {
+        return;
     }
+    checkError(mpv_set_property(mpv_, "ab-loop-b", MPV_FORMAT_DOUBLE, &pos), "set ab-loop-b");
+    loopBExplicitPos_ = pos;
+
+    if (!loopAExplicitPos_.has_value()) {
+        double zero = 0;
+        mpv_set_property(mpv_, "ab-loop-a", MPV_FORMAT_DOUBLE, &zero);
+    }
+    emit loopMarkersChanged(loopAExplicitPos_, loopBExplicitPos_);
 }
 
 void MpvController::clearLoop() {
     checkError(mpv_set_property_string(mpv_, "ab-loop-a", "no"), "clear ab-loop-a");
     checkError(mpv_set_property_string(mpv_, "ab-loop-b", "no"), "clear ab-loop-b");
+    loopAExplicitPos_.reset();
+    loopBExplicitPos_.reset();
+    emit loopMarkersChanged(std::nullopt, std::nullopt);
 }
 
 bool MpvController::isPaused() const {

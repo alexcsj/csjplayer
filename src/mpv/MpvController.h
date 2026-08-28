@@ -6,6 +6,8 @@
 #include <mpv/client.h>
 #include <mpv/render_gl.h>
 
+#include <optional>
+
 // The only class in the codebase allowed to call mpv_* C API functions
 // directly. Owns the mpv_handle and (once MpvGLWidget has a valid GL
 // context) the mpv_render_context. All libmpv callbacks land on mpv's
@@ -54,7 +56,12 @@ public:
     void setPlayDirectionBackward(bool backward);
 
     // F10: A-B loop, using mpv's native ab-loop-a/ab-loop-b properties
-    // directly rather than hand-rolled looping.
+    // directly rather than hand-rolled looping. If the *other* point hasn't
+    // been explicitly set yet when one is set, it's auto-filled to the
+    // video's start/end (0 / duration) so the loop is immediately active
+    // from just one keypress -- but that auto-filled point is not
+    // considered "explicit", so loopMarkersChanged() reports it as unset
+    // (the seek bar hides its marker; only user-set points get one).
     void setLoopA();
     void setLoopB();
     void clearLoop();
@@ -75,6 +82,10 @@ signals:
     void volumeChanged(int percent);
     void mutedChanged(bool muted);
 
+    // nullopt means "no marker to show" (either never set, or auto-filled
+    // rather than explicitly chosen by the user -- see setLoopA()/setLoopB()).
+    void loopMarkersChanged(std::optional<double> loopAExplicitSeconds, std::optional<double> loopBExplicitSeconds);
+
 private slots:
     // Invoked via Qt::QueuedConnection from the mpv wakeup callback.
     void processMpvEvents();
@@ -87,4 +98,7 @@ private:
 
     mpv_handle *mpv_ = nullptr;
     mpv_render_context *mpvGl_ = nullptr;
+
+    std::optional<double> loopAExplicitPos_;
+    std::optional<double> loopBExplicitPos_;
 };

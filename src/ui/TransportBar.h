@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+#include <optional>
+
 class QPushButton;
 class QLabel;
 class SeekBar;
@@ -25,6 +27,7 @@ public slots:
     void setMuted(bool muted);
     void setSpeedState(double magnitude, bool reverse);
     void showReverseFallbackHint();
+    void setLoopMarkers(std::optional<double> aSeconds, std::optional<double> bSeconds);
 
 signals:
     void playPauseClicked();

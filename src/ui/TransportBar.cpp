@@ -24,6 +24,21 @@ TransportBar::TransportBar(QWidget *parent) : QWidget(parent) {
     prevButton_->setEnabled(false);
     nextButton_->setEnabled(false);
 
+    // Fixed widths for anything whose text changes on every position update
+    // (the two time labels) or on every play/pause toggle (the button) --
+    // otherwise a proportional font's per-digit/per-word width differences
+    // reflow the QHBoxLayout on every change, visibly shifting the seek bar
+    // and every widget after it left/right in sync with the ticking clock.
+    const int timeLabelWidth = currentTimeLabel_->fontMetrics().horizontalAdvance(QStringLiteral("00:00:00"));
+    currentTimeLabel_->setFixedWidth(timeLabelWidth);
+    durationLabel_->setFixedWidth(timeLabelWidth);
+    currentTimeLabel_->setAlignment(Qt::AlignCenter);
+    durationLabel_->setAlignment(Qt::AlignCenter);
+
+    const int playPauseWidth =
+        playPauseButton_->fontMetrics().horizontalAdvance(QStringLiteral("Pause")) + 20;
+    playPauseButton_->setFixedWidth(playPauseWidth);
+
     auto *layout = new QHBoxLayout(this);
     layout->addWidget(prevButton_);
     layout->addWidget(playPauseButton_);
@@ -61,6 +76,10 @@ void TransportBar::setSpeedState(double magnitude, bool reverse) {
 
 void TransportBar::showReverseFallbackHint() {
     speedControl_->showFallbackHint();
+}
+
+void TransportBar::setLoopMarkers(std::optional<double> aSeconds, std::optional<double> bSeconds) {
+    seekBar_->setLoopMarkers(aSeconds, bSeconds);
 }
 
 void TransportBar::setPlaylistNavigationEnabled(bool enabled) {

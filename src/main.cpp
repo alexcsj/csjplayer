@@ -4,6 +4,9 @@
 #include <QApplication>
 
 int main(int argc, char *argv[]) {
+    QCoreApplication::setOrganizationName(QStringLiteral("csjplayer"));
+    QCoreApplication::setApplicationName(QStringLiteral("csjplayer"));
+
     QApplication app(argc, argv);
     app.setWindowIcon(AppIcon::build());
     // Matches the "csjplayer" name in the installed .desktop entry -- this

@@ -2,6 +2,8 @@
 
 #include <QSlider>
 
+#include <optional>
+
 // A QSlider subclass for the playback progress bar. Guards against two
 // classic footguns: (1) fighting the user's drag with programmatic position
 // updates from mpv, (2) QSlider's default focus/wheel handling silently
@@ -21,6 +23,11 @@ public:
     // position updates don't fight the drag.
     void setPositionSeconds(double seconds);
 
+public slots:
+    // F10: A-B loop marker positions. nullopt hides that marker (used for
+    // points the user hasn't explicitly set -- see MpvController::setLoopA/B).
+    void setLoopMarkers(std::optional<double> aSeconds, std::optional<double> bSeconds);
+
 signals:
     // Emitted only on release (or click-to-seek), never during drag -- see
     // class comment.
@@ -38,7 +45,10 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
 
 private:
     bool userIsDragging_ = false;
+    std::optional<double> loopAMarker_;
+    std::optional<double> loopBMarker_;
 };

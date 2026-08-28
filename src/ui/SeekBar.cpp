@@ -1,6 +1,8 @@
 #include "ui/SeekBar.h"
 
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPolygon>
 #include <QStyle>
 #include <QWheelEvent>
 
@@ -18,16 +20,33 @@ SeekBar::SeekBar(QWidget *parent) : QSlider(Qt::Horizontal, parent) {
 }
 
 void SeekBar::setDurationSeconds(double seconds) {
-    setRange(0, static_cast<int>(seconds));
+    // Some containers/formats refine their reported duration slightly as
+    // mpv demuxes further into the file, re-firing this with near-identical
+    // values. Re-applying setRange() every time visibly jittered the handle
+    // (and the loop markers, which share the same value/range mapping), so
+    // skip it unless the rounded duration actually changed.
+    const int rounded = qRound(seconds);
+    if (rounded != maximum()) {
+        setRange(0, rounded);
+    }
 }
 
 void SeekBar::setPositionSeconds(double seconds) {
     if (userIsDragging_) {
         return;
     }
+    // Rounding (not truncating) reduces how often minor AV-sync jitter in
+    // mpv's reported time-pos flips the displayed second back and forth
+    // across a whole-second boundary.
     const bool wasBlocked = blockSignals(true);
-    setValue(static_cast<int>(seconds));
+    setValue(qRound(seconds));
     blockSignals(wasBlocked);
+}
+
+void SeekBar::setLoopMarkers(std::optional<double> aSeconds, std::optional<double> bSeconds) {
+    loopAMarker_ = aSeconds;
+    loopBMarker_ = bSeconds;
+    update();
 }
 
 void SeekBar::wheelEvent(QWheelEvent *event) {
@@ -72,4 +91,34 @@ void SeekBar::mouseReleaseEvent(QMouseEvent *event) {
     }
     setSliderDown(false); // emits sliderReleased(), which fires seekRequested()
     event->accept();
+}
+
+void SeekBar::paintEvent(QPaintEvent *event) {
+    QSlider::paintEvent(event);
+
+    if (!loopAMarker_ && !loopBMarker_) {
+        return;
+    }
+    if (maximum() <= minimum()) {
+        return;
+    }
+
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+
+    auto drawMarker = [&](double seconds, const QColor &color) {
+        const double ratio = (seconds - minimum()) / static_cast<double>(maximum() - minimum());
+        const int x = static_cast<int>(ratio * width());
+        painter.setBrush(color);
+        const QPolygon triangle({QPoint(x - 4, 0), QPoint(x + 4, 0), QPoint(x, 7)});
+        painter.drawPolygon(triangle);
+    };
+
+    if (loopAMarker_) {
+        drawMarker(*loopAMarker_, QColor(76, 175, 80));
+    }
+    if (loopBMarker_) {
+        drawMarker(*loopBMarker_, QColor(244, 67, 54));
+    }
 }
