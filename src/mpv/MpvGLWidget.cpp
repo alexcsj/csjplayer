@@ -181,6 +181,8 @@ void MpvGLWidget::contextMenuEvent(QContextMenuEvent *event) {
     QMenu menu(this);
     QAction *infoAction = menu.addAction(QStringLiteral("顯示媒體內容"));
     connect(infoAction, &QAction::triggered, this, &MpvGLWidget::mediaInfoRequested);
+    QAction *seekStepAction = menu.addAction(QStringLiteral("調整快轉/回轉時間"));
+    connect(seekStepAction, &QAction::triggered, this, &MpvGLWidget::seekStepSettingsRequested);
     menu.exec(event->globalPos());
 }
 

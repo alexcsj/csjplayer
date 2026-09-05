@@ -9,11 +9,13 @@
 #include "ui/TitleBar.h"
 #include "ui/TransportBar.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QKeyEvent>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QResizeEvent>
@@ -29,9 +31,33 @@
 
 namespace {
 
-constexpr double kSeekStepShortSeconds = 60.0;
-constexpr double kSeekStepLongSeconds = 300.0;
 constexpr int kVolumeStep = 5;
+
+constexpr const char *kSeekStepSettingsKey = "seek/stepSeconds";
+
+SeekStepSettings loadSeekStepSettings() {
+    QSettings settings;
+    SeekStepSettings result; // struct defaults double as the first-run values
+    settings.beginGroup(QLatin1String(kSeekStepSettingsKey));
+    result.plainSeconds = settings.value(QStringLiteral("plain"), result.plainSeconds).toInt();
+    result.zSeconds = settings.value(QStringLiteral("z"), result.zSeconds).toInt();
+    result.xSeconds = settings.value(QStringLiteral("x"), result.xSeconds).toInt();
+    result.cSeconds = settings.value(QStringLiteral("c"), result.cSeconds).toInt();
+    result.ctrlSeconds = settings.value(QStringLiteral("ctrl"), result.ctrlSeconds).toInt();
+    settings.endGroup();
+    return result;
+}
+
+void saveSeekStepSettings(const SeekStepSettings &s) {
+    QSettings settings;
+    settings.beginGroup(QLatin1String(kSeekStepSettingsKey));
+    settings.setValue(QStringLiteral("plain"), s.plainSeconds);
+    settings.setValue(QStringLiteral("z"), s.zSeconds);
+    settings.setValue(QStringLiteral("x"), s.xSeconds);
+    settings.setValue(QStringLiteral("c"), s.cSeconds);
+    settings.setValue(QStringLiteral("ctrl"), s.ctrlSeconds);
+    settings.endGroup();
+}
 
 // A short, representative subset (not the full ~23-extension list from
 // MediaExtensions) -- the full list on one filter-combo line was wide
@@ -202,6 +228,13 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     resize(960, 540);
     setAcceptDrops(true);
 
+    seekStepSettings_ = loadSeekStepSettings();
+
+    // Z/X/C held-state tracking for the seek-step shortcuts needs to see
+    // every key press/release application-wide, not just ones delivered to
+    // this widget -- see the eventFilter() override doc comment.
+    QCoreApplication::instance()->installEventFilter(this);
+
     // Permanently frameless: the window is never shown with native
     // decorations, so there is nothing to toggle/recreate at runtime (see
     // TitleBar.h comment for why that used to break window positioning).
@@ -311,26 +344,30 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     playPauseShortcut->setContext(Qt::WindowShortcut);
     connect(playPauseShortcut, &QShortcut::activated, mpvController_, &MpvController::togglePause);
 
-    // F6: seek shortcuts.
+    // F6: seek shortcuts. Z/X/C+Left/Right (1s/5s/15s) share these same two
+    // QShortcut objects rather than needing their own -- Z/X/C aren't real
+    // QKeySequence modifiers, so a plain "Right" shortcut fires regardless
+    // of whether one of them is also held; seekStepForModifierKeys() (fed
+    // by the eventFilter() held-state tracking) picks the step size.
     auto *seekForwardShortcut = new QShortcut(QKeySequence(Qt::Key_Right), this);
     seekForwardShortcut->setContext(Qt::WindowShortcut);
     connect(seekForwardShortcut, &QShortcut::activated, this,
-            [this]() { mpvController_->seekRelative(kSeekStepShortSeconds); });
+            [this]() { mpvController_->seekRelative(seekStepForModifierKeys()); });
 
     auto *seekBackwardShortcut = new QShortcut(QKeySequence(Qt::Key_Left), this);
     seekBackwardShortcut->setContext(Qt::WindowShortcut);
     connect(seekBackwardShortcut, &QShortcut::activated, this,
-            [this]() { mpvController_->seekRelative(-kSeekStepShortSeconds); });
+            [this]() { mpvController_->seekRelative(-seekStepForModifierKeys()); });
 
     auto *seekForwardLongShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Right), this);
     seekForwardLongShortcut->setContext(Qt::WindowShortcut);
     connect(seekForwardLongShortcut, &QShortcut::activated, this,
-            [this]() { mpvController_->seekRelative(kSeekStepLongSeconds); });
+            [this]() { mpvController_->seekRelative(seekStepSettings_.ctrlSeconds); });
 
     auto *seekBackwardLongShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Left), this);
     seekBackwardLongShortcut->setContext(Qt::WindowShortcut);
     connect(seekBackwardLongShortcut, &QShortcut::activated, this,
-            [this]() { mpvController_->seekRelative(-kSeekStepLongSeconds); });
+            [this]() { mpvController_->seekRelative(-seekStepSettings_.ctrlSeconds); });
 
     // F7: volume shortcuts.
     auto *volumeUpShortcut = new QShortcut(QKeySequence(Qt::Key_Up), this);
@@ -380,6 +417,8 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     };
     connect(mpvWidget_, &MpvGLWidget::fullscreenToggleRequested, this, toggleFullscreen);
     connect(mpvWidget_, &MpvGLWidget::mediaInfoRequested, this, &PlayerWindow::showMediaInfo);
+    connect(mpvWidget_, &MpvGLWidget::seekStepSettingsRequested, this,
+            &PlayerWindow::showSeekStepSettingsDialog);
 
     auto *fullscreenShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);
     fullscreenShortcut->setContext(Qt::WindowShortcut);
@@ -511,6 +550,51 @@ void PlayerWindow::showMediaInfo() {
     QMessageBox::information(this, QStringLiteral("媒體內容"), mpvController_->mediaInfoText());
 }
 
+void PlayerWindow::showSeekStepSettingsDialog() {
+    SeekStepSettingsDialog dialog(seekStepSettings_, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        seekStepSettings_ = dialog.values();
+        saveSeekStepSettings(seekStepSettings_);
+    }
+}
+
+double PlayerWindow::seekStepForModifierKeys() const {
+    if (zHeld_) {
+        return seekStepSettings_.zSeconds;
+    }
+    if (xHeld_) {
+        return seekStepSettings_.xSeconds;
+    }
+    if (cHeld_) {
+        return seekStepSettings_.cSeconds;
+    }
+    return seekStepSettings_.plainSeconds;
+}
+
+bool PlayerWindow::eventFilter(QObject *watched, QEvent *event) {
+    if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
+        auto *keyEvent = static_cast<QKeyEvent *>(event);
+        bool *heldFlag = nullptr;
+        switch (keyEvent->key()) {
+        case Qt::Key_Z:
+            heldFlag = &zHeld_;
+            break;
+        case Qt::Key_X:
+            heldFlag = &xHeld_;
+            break;
+        case Qt::Key_C:
+            heldFlag = &cHeld_;
+            break;
+        default:
+            break;
+        }
+        if (heldFlag) {
+            *heldFlag = (event->type() == QEvent::KeyPress);
+        }
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
 void PlayerWindow::resizeToPreset(const QSize &size) {
     QSize target = size;
     if (QScreen *scr = screen()) {
@@ -547,11 +631,11 @@ void PlayerWindow::wheelEvent(QWheelEvent *event) {
     const bool ctrlHeld = event->modifiers().testFlag(Qt::ControlModifier);
 
     if (angleDelta.x() != 0 && std::abs(angleDelta.x()) >= std::abs(angleDelta.y())) {
-        // F6: horizontal wheel tilt seeks; Ctrl scales 1 min -> 5 min.
-        // Negated vs. the "obvious" angleDelta().x() sign -- reported as
-        // feeling backwards (tilt-right was seeking backward) on the user's
-        // hardware/platform.
-        const double step = ctrlHeld ? kSeekStepLongSeconds : kSeekStepShortSeconds;
+        // F6: horizontal wheel tilt seeks; Ctrl uses the long (Ctrl+arrow)
+        // step instead of the plain one. Negated vs. the "obvious"
+        // angleDelta().x() sign -- reported as feeling backwards (tilt-right
+        // was seeking backward) on the user's hardware/platform.
+        const double step = ctrlHeld ? seekStepSettings_.ctrlSeconds : seekStepSettings_.plainSeconds;
         mpvController_->seekRelative(angleDelta.x() > 0 ? -step : step);
         event->accept();
         return;

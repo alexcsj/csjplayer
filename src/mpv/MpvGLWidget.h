@@ -41,6 +41,9 @@ signals:
     // Right-click menu's "顯示媒體內容" action.
     void mediaInfoRequested();
 
+    // Right-click menu's "調整快轉/回轉時間" action.
+    void seekStepSettingsRequested();
+
 protected:
     void initializeGL() override;
     void paintGL() override;

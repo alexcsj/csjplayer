@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+#include "ui/SeekStepSettingsDialog.h"
+
 class MpvController;
 class MpvGLWidget;
 class TransportBar;
@@ -45,6 +47,14 @@ protected:
     // reaches here.
     void wheelEvent(QWheelEvent *event) override;
 
+    // Tracks whether Z/X/C are currently held, for the Z/X/C+Left/Right
+    // seek-step shortcuts. Installed as an application-wide event filter
+    // (not just this window's own keyPressEvent) so it keeps working
+    // regardless of which child widget currently has focus -- the same
+    // reason the seek/volume/etc. shortcuts elsewhere use QShortcut with
+    // Qt::WindowShortcut context instead of a plain event handler.
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     // Shared "pick media files" dialog (with the pause-during-dialog and
     // DontUseNativeDialog mitigations); returns the picked paths, or empty
@@ -72,8 +82,14 @@ private:
     // workaround needed).
     void resizeToPreset(const QSize &size);
 
-    // Right-click context menu's "顯示媒體內容" action.
+    // Right-click context menu actions.
     void showMediaInfo();
+    void showSeekStepSettingsDialog();
+
+    // Z/X/C+Left/Right seek step size, falling back to the plain
+    // Left/Right step when none of them are held. All sizes come from
+    // seekStepSettings_ (user-adjustable via showSeekStepSettingsDialog()).
+    double seekStepForModifierKeys() const;
 
     MpvController *mpvController_ = nullptr;
     MpvGLWidget *mpvWidget_ = nullptr;
@@ -85,4 +101,13 @@ private:
 
     bool chromeHidden_ = false;
     bool playlistPanelWasVisibleBeforeHide_ = false;
+
+    // Held-state for the Z/X/C seek-step modifier keys (see eventFilter()).
+    bool zHeld_ = false;
+    bool xHeld_ = false;
+    bool cHeld_ = false;
+
+    // User-adjustable seek step sizes; loaded from QSettings at startup and
+    // saved whenever changed via showSeekStepSettingsDialog().
+    SeekStepSettings seekStepSettings_;
 };

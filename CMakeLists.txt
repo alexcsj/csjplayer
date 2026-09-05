@@ -34,6 +34,7 @@ set(SOURCES
     src/ui/PlaylistPanel.cpp
     src/ui/PlaylistView.cpp
     src/ui/SeekBar.cpp
+    src/ui/SeekStepSettingsDialog.cpp
     src/ui/SpeedControl.cpp
     src/ui/TitleBar.cpp
     src/ui/TransportBar.cpp
