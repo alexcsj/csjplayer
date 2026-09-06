@@ -3,6 +3,7 @@
 #include <QWidget>
 
 #include "ui/SeekStepSettingsDialog.h"
+#include "ui/WindowSizePresetsDialog.h"
 
 class MpvController;
 class MpvGLWidget;
@@ -85,6 +86,7 @@ private:
     // Right-click context menu actions.
     void showMediaInfo();
     void showSeekStepSettingsDialog();
+    void showWindowSizePresetsDialog();
 
     // Z/X/C+Left/Right seek step size, falling back to the plain
     // Left/Right step when none of them are held. All sizes come from
@@ -110,4 +112,9 @@ private:
     // User-adjustable seek step sizes; loaded from QSettings at startup and
     // saved whenever changed via showSeekStepSettingsDialog().
     SeekStepSettings seekStepSettings_;
+
+    // User-adjustable Alt+1..Alt+5 window size presets; loaded from
+    // QSettings at startup and saved whenever changed via
+    // showWindowSizePresetsDialog().
+    WindowSizePresets windowSizePresets_;
 };

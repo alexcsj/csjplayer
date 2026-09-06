@@ -39,6 +39,7 @@ set(SOURCES
     src/ui/TitleBar.cpp
     src/ui/TransportBar.cpp
     src/ui/VolumeControl.cpp
+    src/ui/WindowSizePresetsDialog.cpp
     src/util/AppIcon.cpp
 )
 

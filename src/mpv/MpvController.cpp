@@ -314,6 +314,19 @@ QString MpvController::mediaInfoText() const {
     return lines.join(QLatin1Char('\n'));
 }
 
+QSize MpvController::videoNativeSize() const {
+    int64_t width = 0;
+    int64_t height = 0;
+    if (mpv_get_property(mpv_, "dwidth", MPV_FORMAT_INT64, &width) < 0 ||
+        mpv_get_property(mpv_, "dheight", MPV_FORMAT_INT64, &height) < 0) {
+        return QSize();
+    }
+    if (width <= 0 || height <= 0) {
+        return QSize();
+    }
+    return QSize(static_cast<int>(width), static_cast<int>(height));
+}
+
 // Fires on an mpv-internal render thread. Must stay minimal: no mpv_* calls,
 // no Qt widget access. We only ever hop to the GUI thread.
 void MpvController::onMpvRenderUpdate(void *ctx) {

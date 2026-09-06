@@ -13,9 +13,18 @@
 
 #include <mpv/render_gl.h>
 
+#include <algorithm>
+#include <cmath>
+
 namespace {
 
-constexpr int kResizeMarginPx = 8;
+constexpr int kMinCornerResizeSize = 200;
+
+bool isCorner(Qt::Edges edges) {
+    const bool horizontal = edges & (Qt::LeftEdge | Qt::RightEdge);
+    const bool vertical = edges & (Qt::TopEdge | Qt::BottomEdge);
+    return horizontal && vertical;
+}
 
 void *getProcAddressQt(void * /*ctx*/, const char *name) {
     QOpenGLContext *glContext = QOpenGLContext::currentContext();
@@ -76,20 +85,54 @@ void MpvGLWidget::initializeGL() {
 }
 
 Qt::Edges MpvGLWidget::edgesAt(const QPoint &localPos) const {
+    // Corner zones are proportionally sized (1/10 of width/height) so
+    // they're actually easy to grab -- the plain resizeMarginPx_ (5px by
+    // default) was far too small a target once two of those margins had to
+    // overlap in both axes at once. Single-edge zones (away from any corner)
+    // keep the smaller, user-adjustable margin.
+    const int cornerMarginX = std::max(resizeMarginPx_, width() / 10);
+    const int cornerMarginY = std::max(resizeMarginPx_, height() / 10);
+
+    const bool nearLeftCorner = localPos.x() <= cornerMarginX;
+    const bool nearRightCorner = localPos.x() >= width() - cornerMarginX;
+    const bool nearTopCorner = localPos.y() <= cornerMarginY;
+    const bool nearBottomCorner = localPos.y() >= height() - cornerMarginY;
+
+    if ((nearLeftCorner || nearRightCorner) && (nearTopCorner || nearBottomCorner)) {
+        Qt::Edges cornerEdges;
+        if (nearLeftCorner) {
+            cornerEdges |= Qt::LeftEdge;
+        }
+        if (nearRightCorner) {
+            cornerEdges |= Qt::RightEdge;
+        }
+        if (nearTopCorner) {
+            cornerEdges |= Qt::TopEdge;
+        }
+        if (nearBottomCorner) {
+            cornerEdges |= Qt::BottomEdge;
+        }
+        return cornerEdges;
+    }
+
     Qt::Edges edges;
-    if (localPos.x() <= kResizeMarginPx) {
+    if (localPos.x() <= resizeMarginPx_) {
         edges |= Qt::LeftEdge;
     }
-    if (localPos.x() >= width() - kResizeMarginPx) {
+    if (localPos.x() >= width() - resizeMarginPx_) {
         edges |= Qt::RightEdge;
     }
-    if (localPos.y() <= kResizeMarginPx) {
+    if (localPos.y() <= resizeMarginPx_) {
         edges |= Qt::TopEdge;
     }
-    if (localPos.y() >= height() - kResizeMarginPx) {
+    if (localPos.y() >= height() - resizeMarginPx_) {
         edges |= Qt::BottomEdge;
     }
     return edges;
+}
+
+void MpvGLWidget::setResizeMarginPx(int px) {
+    resizeMarginPx_ = std::max(1, px);
 }
 
 void MpvGLWidget::updateHoverCursor(const QPoint &localPos) {
@@ -112,8 +155,20 @@ void MpvGLWidget::mousePressEvent(QMouseEvent *event) {
     // untouched so a plain click still reaches the base class normally.
     if (event->button() == Qt::LeftButton && !window()->isFullScreen()) {
         const Qt::Edges edges = edgesAt(event->position().toPoint());
+        if (isCorner(edges)) {
+            // Corners: manual aspect-ratio-locked resize (see class doc
+            // comment) instead of startSystemResize().
+            pendingCornerResize_ = true;
+            cornerEdges_ = edges;
+            cornerDragStartGlobalPos_ = event->globalPosition().toPoint();
+            cornerDragStartSize_ = window()->size();
+            cornerAspectRatio_ =
+                static_cast<double>(cornerDragStartSize_.width()) / std::max(1, cornerDragStartSize_.height());
+            event->accept();
+            return;
+        }
         if (edges != Qt::Edges()) {
-            // At an edge: hand the interactive resize off to the
+            // At a plain edge: hand the interactive resize off to the
             // compositor/WM immediately (see header comment for why this,
             // rather than computing geometry ourselves, is required).
             if (QWindow *handle = window()->windowHandle()) {
@@ -135,6 +190,35 @@ void MpvGLWidget::mousePressEvent(QMouseEvent *event) {
 }
 
 void MpvGLWidget::mouseMoveEvent(QMouseEvent *event) {
+    if (pendingCornerResize_) {
+        if (!(event->buttons() & Qt::LeftButton)) {
+            // Stray move with the button already gone (e.g. released outside
+            // the widget) -- stop tracking rather than keep resizing forever.
+            pendingCornerResize_ = false;
+        } else {
+            const QPoint delta = event->globalPosition().toPoint() - cornerDragStartGlobalPos_;
+            // Growing "outward" from the grabbed corner means moving right/
+            // down for the right/bottom edges, but left/up for the left/top
+            // edges -- flip the sign for those so growX/growY are always
+            // positive when the user drags away from the window.
+            const double growX = (cornerEdges_ & Qt::RightEdge) ? delta.x() : -delta.x();
+            const double growY = (cornerEdges_ & Qt::BottomEdge) ? delta.y() : -delta.y();
+
+            int newWidth;
+            int newHeight;
+            if (std::abs(growX) >= std::abs(growY)) {
+                newWidth = std::max(kMinCornerResizeSize, cornerDragStartSize_.width() + static_cast<int>(growX));
+                newHeight = static_cast<int>(newWidth / cornerAspectRatio_);
+            } else {
+                newHeight = std::max(kMinCornerResizeSize, cornerDragStartSize_.height() + static_cast<int>(growY));
+                newWidth = static_cast<int>(newHeight * cornerAspectRatio_);
+            }
+            window()->resize(newWidth, newHeight);
+            event->accept();
+            return;
+        }
+    }
+
     if (!(event->buttons() & Qt::LeftButton)) {
         updateHoverCursor(event->position().toPoint());
         QOpenGLWidget::mouseMoveEvent(event);
@@ -164,6 +248,7 @@ void MpvGLWidget::mouseMoveEvent(QMouseEvent *event) {
 void MpvGLWidget::mouseReleaseEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
         pendingLeftDrag_ = false;
+        pendingCornerResize_ = false;
     }
     QOpenGLWidget::mouseReleaseEvent(event);
 }
@@ -183,6 +268,8 @@ void MpvGLWidget::contextMenuEvent(QContextMenuEvent *event) {
     connect(infoAction, &QAction::triggered, this, &MpvGLWidget::mediaInfoRequested);
     QAction *seekStepAction = menu.addAction(QStringLiteral("調整快轉/回轉時間"));
     connect(seekStepAction, &QAction::triggered, this, &MpvGLWidget::seekStepSettingsRequested);
+    QAction *windowSizeAction = menu.addAction(QStringLiteral("調整視窗大小快捷鍵"));
+    connect(windowSizeAction, &QAction::triggered, this, &MpvGLWidget::windowSizeSettingsRequested);
     menu.exec(event->globalPos());
 }
 

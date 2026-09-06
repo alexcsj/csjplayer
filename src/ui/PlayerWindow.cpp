@@ -59,6 +59,35 @@ void saveSeekStepSettings(const SeekStepSettings &s) {
     settings.endGroup();
 }
 
+constexpr const char *kWindowSizePresetsSettingsKey = "window/sizePresets";
+
+WindowSizePresets loadWindowSizePresets() {
+    QSettings settings;
+    WindowSizePresets result; // struct defaults double as the first-run values
+    settings.beginGroup(QLatin1String(kWindowSizePresetsSettingsKey));
+    for (int i = 0; i < 5; ++i) {
+        const QString prefix = QStringLiteral("preset%1").arg(i + 1);
+        result.presets[i].width = settings.value(prefix + QStringLiteral("Width"), result.presets[i].width).toInt();
+        result.presets[i].height =
+            settings.value(prefix + QStringLiteral("Height"), result.presets[i].height).toInt();
+    }
+    result.resizeMarginPx = settings.value(QStringLiteral("resizeMarginPx"), result.resizeMarginPx).toInt();
+    settings.endGroup();
+    return result;
+}
+
+void saveWindowSizePresets(const WindowSizePresets &p) {
+    QSettings settings;
+    settings.beginGroup(QLatin1String(kWindowSizePresetsSettingsKey));
+    for (int i = 0; i < 5; ++i) {
+        const QString prefix = QStringLiteral("preset%1").arg(i + 1);
+        settings.setValue(prefix + QStringLiteral("Width"), p.presets[i].width);
+        settings.setValue(prefix + QStringLiteral("Height"), p.presets[i].height);
+    }
+    settings.setValue(QStringLiteral("resizeMarginPx"), p.resizeMarginPx);
+    settings.endGroup();
+}
+
 // A short, representative subset (not the full ~23-extension list from
 // MediaExtensions) -- the full list on one filter-combo line was wide
 // enough to force the whole dialog to a large, non-shrinkable minimum
@@ -229,6 +258,7 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     setAcceptDrops(true);
 
     seekStepSettings_ = loadSeekStepSettings();
+    windowSizePresets_ = loadWindowSizePresets();
 
     // Z/X/C held-state tracking for the seek-step shortcuts needs to see
     // every key press/release application-wide, not just ones delivered to
@@ -244,6 +274,7 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
 
     mpvController_ = new MpvController(this);
     mpvWidget_ = new MpvGLWidget(mpvController_, this);
+    mpvWidget_->setResizeMarginPx(windowSizePresets_.resizeMarginPx);
     titleBar_ = new TitleBar(this);
     transportBar_ = new TransportBar(this);
     playlistController_ = new PlaylistController(mpvController_, this);
@@ -393,18 +424,37 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     loopClearShortcut->setContext(Qt::WindowShortcut);
     connect(loopClearShortcut, &QShortcut::activated, mpvController_, &MpvController::clearLoop);
 
-    // F1/Alt+1/2/3: window size presets.
-    auto *size1Shortcut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_1), this);
-    size1Shortcut->setContext(Qt::WindowShortcut);
-    connect(size1Shortcut, &QShortcut::activated, this, [this]() { resizeToPreset(QSize(960, 540)); });
+    // Alt+1..Alt+5: window size presets (user-adjustable, see
+    // showWindowSizePresetsDialog()). Defaults: 960x540, 1920x1080,
+    // 3840x2160, 540x960, 1080x1920.
+    for (int i = 0; i < 5; ++i) {
+        const auto key = static_cast<Qt::Key>(Qt::Key_1 + i);
+        auto *sizeShortcut = new QShortcut(QKeySequence(Qt::ALT | key), this);
+        sizeShortcut->setContext(Qt::WindowShortcut);
+        connect(sizeShortcut, &QShortcut::activated, this, [this, i]() {
+            const WindowSizePreset &preset = windowSizePresets_.presets[i];
+            resizeToPreset(QSize(preset.width, preset.height));
+        });
+    }
 
-    auto *size2Shortcut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_2), this);
-    size2Shortcut->setContext(Qt::WindowShortcut);
-    connect(size2Shortcut, &QShortcut::activated, this, [this]() { resizeToPreset(QSize(1920, 1080)); });
+    // Alt+0: resize to the current video's native resolution.
+    auto *nativeSizeShortcut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_0), this);
+    nativeSizeShortcut->setContext(Qt::WindowShortcut);
+    connect(nativeSizeShortcut, &QShortcut::activated, this, [this]() {
+        const QSize native = mpvController_->videoNativeSize();
+        if (!native.isEmpty()) {
+            resizeToPreset(native);
+        }
+    });
 
-    auto *size3Shortcut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_3), this);
-    size3Shortcut->setContext(Qt::WindowShortcut);
-    connect(size3Shortcut, &QShortcut::activated, this, [this]() { resizeToPreset(QSize(3840, 2160)); });
+    // Esc / Ctrl+Q: quit the app.
+    auto *quitShortcutEsc = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    quitShortcutEsc->setContext(Qt::WindowShortcut);
+    connect(quitShortcutEsc, &QShortcut::activated, this, &QWidget::close);
+
+    auto *quitShortcutCtrlQ = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), this);
+    quitShortcutCtrlQ->setContext(Qt::WindowShortcut);
+    connect(quitShortcutCtrlQ, &QShortcut::activated, this, &QWidget::close);
 
     // Left+right mouse chord on the video toggles fullscreen (middle-click
     // turned out unreliable on the user's platform/WM).
@@ -419,6 +469,8 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(mpvWidget_, &MpvGLWidget::mediaInfoRequested, this, &PlayerWindow::showMediaInfo);
     connect(mpvWidget_, &MpvGLWidget::seekStepSettingsRequested, this,
             &PlayerWindow::showSeekStepSettingsDialog);
+    connect(mpvWidget_, &MpvGLWidget::windowSizeSettingsRequested, this,
+            &PlayerWindow::showWindowSizePresetsDialog);
 
     auto *fullscreenShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);
     fullscreenShortcut->setContext(Qt::WindowShortcut);
@@ -558,6 +610,15 @@ void PlayerWindow::showSeekStepSettingsDialog() {
     }
 }
 
+void PlayerWindow::showWindowSizePresetsDialog() {
+    WindowSizePresetsDialog dialog(windowSizePresets_, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        windowSizePresets_ = dialog.values();
+        saveWindowSizePresets(windowSizePresets_);
+        mpvWidget_->setResizeMarginPx(windowSizePresets_.resizeMarginPx);
+    }
+}
+
 double PlayerWindow::seekStepForModifierKeys() const {
     if (zHeld_) {
         return seekStepSettings_.zSeconds;
@@ -599,7 +660,15 @@ void PlayerWindow::resizeToPreset(const QSize &size) {
     QSize target = size;
     if (QScreen *scr = screen()) {
         const QSize avail = scr->availableGeometry().size();
-        target = QSize(std::min(target.width(), avail.width()), std::min(target.height(), avail.height()));
+        // Clamping width/height independently breaks the aspect ratio
+        // whenever only one dimension overflows the screen (e.g. Alt+0 on a
+        // 4K video with a 1080p screen), which is exactly what produced the
+        // black letterbox/pillarbox bars the user reported -- scale the
+        // whole size down uniformly instead so the window still exactly
+        // matches the video's aspect ratio.
+        if (target.width() > avail.width() || target.height() > avail.height()) {
+            target.scale(avail, Qt::KeepAspectRatio);
+        }
     }
     if (isFullScreen() || isMaximized()) {
         showNormal();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QSize>
 #include <QString>
 
 #include <mpv/client.h>
@@ -72,6 +73,10 @@ public:
     // Human-readable, multi-line media info (container, resolution, codecs,
     // fps, bitrates, ...) for the right-click "顯示媒體內容" menu action.
     QString mediaInfoText() const;
+
+    // Native display resolution (dwidth/dheight) of the current video, or
+    // an invalid (0x0) QSize if none is loaded. For Alt+0.
+    QSize videoNativeSize() const;
 
 signals:
     // Emitted (GUI thread) whenever mpv has a new frame ready to present.
