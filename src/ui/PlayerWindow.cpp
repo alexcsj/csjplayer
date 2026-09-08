@@ -18,6 +18,7 @@
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QSettings>
@@ -400,6 +401,21 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(seekBackwardLongShortcut, &QShortcut::activated, this,
             [this]() { mpvController_->seekRelative(-seekStepSettings_.ctrlSeconds); });
 
+    // Some tilt-wheel mice (seen with a Lenovo mouse, unlike the Logitech MX
+    // Anywhere 2 wheelEvent() was originally tuned on) don't send a real
+    // QWheelEvent for the tilt click at all -- their driver/receiver maps it
+    // to the OS-level browser Back/Forward keys instead. Bind those too so
+    // tilt-left/right still seeks on that hardware.
+    auto *seekForwardKeyShortcut = new QShortcut(QKeySequence(Qt::Key_Forward), this);
+    seekForwardKeyShortcut->setContext(Qt::WindowShortcut);
+    connect(seekForwardKeyShortcut, &QShortcut::activated, this,
+            [this]() { mpvController_->seekRelative(seekStepSettings_.plainSeconds); });
+
+    auto *seekBackwardKeyShortcut = new QShortcut(QKeySequence(Qt::Key_Back), this);
+    seekBackwardKeyShortcut->setContext(Qt::WindowShortcut);
+    connect(seekBackwardKeyShortcut, &QShortcut::activated, this,
+            [this]() { mpvController_->seekRelative(-seekStepSettings_.plainSeconds); });
+
     // F7: volume shortcuts.
     auto *volumeUpShortcut = new QShortcut(QKeySequence(Qt::Key_Up), this);
     volumeUpShortcut->setContext(Qt::WindowShortcut);
@@ -653,6 +669,40 @@ bool PlayerWindow::eventFilter(QObject *watched, QEvent *event) {
             *heldFlag = (event->type() == QEvent::KeyPress);
         }
     }
+
+    if (event->type() == QEvent::MouseButtonPress) {
+        // Some tilt-wheel mice implement the tilt click as a literal extra
+        // mouse button (evdev BTN_SIDE/BTN_EXTRA/... or vendor-specific
+        // codes) rather than a QWheelEvent or an OS-level Back/Forward key
+        // -- neither of which worked on the Lenovo mouse this was added
+        // for. Which exact Qt::MouseButton value that maps to depends on
+        // the device/driver, so treat the whole "extra button" range as
+        // alternating backward/forward pairs rather than betting on one
+        // specific button. Handled here (an application-wide event filter)
+        // rather than as a mousePressEvent() override, because plain mouse
+        // button presses -- unlike wheel events -- don't bubble up from
+        // whichever child widget (video surface, title bar, ...) actually
+        // received the click.
+        static const Qt::MouseButton kBackwardButtons[] = {
+            Qt::BackButton, Qt::ExtraButton3, Qt::ExtraButton5, Qt::ExtraButton7,
+        };
+        static const Qt::MouseButton kForwardButtons[] = {
+            Qt::ForwardButton, Qt::ExtraButton4, Qt::ExtraButton6, Qt::ExtraButton8,
+        };
+        const auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        const Qt::MouseButton button = mouseEvent->button();
+        if (std::find(std::begin(kBackwardButtons), std::end(kBackwardButtons), button) !=
+            std::end(kBackwardButtons)) {
+            mpvController_->seekRelative(-seekStepSettings_.plainSeconds);
+            return true;
+        }
+        if (std::find(std::begin(kForwardButtons), std::end(kForwardButtons), button) !=
+            std::end(kForwardButtons)) {
+            mpvController_->seekRelative(seekStepSettings_.plainSeconds);
+            return true;
+        }
+    }
+
     return QWidget::eventFilter(watched, event);
 }
 
@@ -696,7 +746,15 @@ void PlayerWindow::dropEvent(QDropEvent *event) {
 }
 
 void PlayerWindow::wheelEvent(QWheelEvent *event) {
-    const QPoint angleDelta = event->angleDelta();
+    QPoint angleDelta = event->angleDelta();
+    if (angleDelta.isNull()) {
+        // Not every mouse/driver reports angle deltas -- some (seen with a
+        // Lenovo tilt-wheel mouse, vs. the Logitech MX Anywhere 2 this was
+        // originally tuned on) only populate pixelDelta(), so fall back to
+        // that. Signs follow the same up/right-is-positive convention as
+        // angleDelta(), so the logic below doesn't need to change.
+        angleDelta = event->pixelDelta();
+    }
     const bool ctrlHeld = event->modifiers().testFlag(Qt::ControlModifier);
 
     if (angleDelta.x() != 0 && std::abs(angleDelta.x()) >= std::abs(angleDelta.y())) {
