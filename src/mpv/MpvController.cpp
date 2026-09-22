@@ -341,6 +341,16 @@ QSize MpvController::videoNativeSize() const {
     return QSize(static_cast<int>(width), static_cast<int>(height));
 }
 
+QString MpvController::currentFilePath() const {
+    char *raw = mpv_get_property_string(mpv_, "path");
+    if (!raw) {
+        return QString();
+    }
+    QString result = QString::fromUtf8(raw);
+    mpv_free(raw);
+    return result;
+}
+
 // Fires on an mpv-internal render thread. Must stay minimal: no mpv_* calls,
 // no Qt widget access. We only ever hop to the GUI thread.
 void MpvController::onMpvRenderUpdate(void *ctx) {

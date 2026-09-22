@@ -85,6 +85,11 @@ public:
     // an invalid (0x0) QSize if none is loaded. For Alt+0.
     QSize videoNativeSize() const;
 
+    // Full path of the currently loaded file (mpv's "path" property), or
+    // empty if nothing is loaded. Used by the "寫入檔案" audio-sync action
+    // to know what to feed ffmpeg.
+    QString currentFilePath() const;
+
 signals:
     // Emitted (GUI thread) whenever mpv has a new frame ready to present.
     void frameReady();

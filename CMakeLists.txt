@@ -42,6 +42,7 @@ set(SOURCES
     src/ui/VolumeControl.cpp
     src/ui/WindowSizePresetsDialog.cpp
     src/util/AppIcon.cpp
+    src/util/AudioSyncMuxer.cpp
 )
 
 qt_add_resources(SOURCES resources/csjplayer.qrc)

@@ -9,6 +9,7 @@
 #include "ui/PlaylistView.h"
 #include "ui/TitleBar.h"
 #include "ui/TransportBar.h"
+#include "util/AudioSyncMuxer.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -20,6 +21,7 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QProgressDialog>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QSettings>
@@ -639,9 +641,47 @@ void PlayerWindow::showWindowSizePresetsDialog() {
 
 void PlayerWindow::showAudioSyncDialog() {
     AudioSyncDialog dialog(mpvController_->audioDelayMs(), this);
-    if (dialog.exec() == QDialog::Accepted) {
-        mpvController_->setAudioDelayMs(dialog.valueMs());
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
     }
+    const int ms = dialog.valueMs();
+    mpvController_->setAudioDelayMs(ms);
+
+    if (!dialog.writeToFile()) {
+        return;
+    }
+    if (ms == 0) {
+        QMessageBox::information(this, QStringLiteral("寫入檔案"), QStringLiteral("偏移量為 0,沒有需要寫入的調整。"));
+        return;
+    }
+    const QString inputPath = mpvController_->currentFilePath();
+    if (inputPath.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("寫入檔案"), QStringLiteral("目前沒有正在播放的檔案。"));
+        return;
+    }
+
+    auto *progress = new QProgressDialog(QStringLiteral("正在寫入檔案(重新封裝中)…"), QString(), 0, 0, this);
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setWindowTitle(QStringLiteral("寫入檔案"));
+    progress->setCancelButton(nullptr);
+    progress->setMinimumDuration(0);
+    progress->show();
+
+    auto *muxer = new AudioSyncMuxer(this);
+    connect(muxer, &AudioSyncMuxer::finished, this, [this, progress, muxer](const QString &outputPath) {
+        progress->close();
+        progress->deleteLater();
+        muxer->deleteLater();
+        QMessageBox::information(this, QStringLiteral("寫入檔案完成"),
+                                  QStringLiteral("已寫入新檔案:\n%1").arg(outputPath));
+    });
+    connect(muxer, &AudioSyncMuxer::failed, this, [this, progress, muxer](const QString &errorMessage) {
+        progress->close();
+        progress->deleteLater();
+        muxer->deleteLater();
+        QMessageBox::warning(this, QStringLiteral("寫入檔案失敗"), errorMessage);
+    });
+    muxer->start(inputPath, ms);
 }
 
 double PlayerWindow::seekStepForModifierKeys() const {
