@@ -270,6 +270,8 @@ void MpvGLWidget::contextMenuEvent(QContextMenuEvent *event) {
     connect(seekStepAction, &QAction::triggered, this, &MpvGLWidget::seekStepSettingsRequested);
     QAction *windowSizeAction = menu.addAction(QStringLiteral("調整視窗大小快捷鍵"));
     connect(windowSizeAction, &QAction::triggered, this, &MpvGLWidget::windowSizeSettingsRequested);
+    QAction *audioSyncAction = menu.addAction(QStringLiteral("調整音訊/視訊同步"));
+    connect(audioSyncAction, &QAction::triggered, this, &MpvGLWidget::audioSyncSettingsRequested);
     menu.exec(event->globalPos());
 }
 

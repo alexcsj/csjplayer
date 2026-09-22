@@ -3,6 +3,7 @@
 #include "mpv/MpvGLWidget.h"
 #include "playback/PlaylistController.h"
 #include "playback/SpeedController.h"
+#include "ui/AudioSyncDialog.h"
 #include "ui/PlaylistModel.h"
 #include "ui/PlaylistPanel.h"
 #include "ui/PlaylistView.h"
@@ -487,6 +488,7 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
             &PlayerWindow::showSeekStepSettingsDialog);
     connect(mpvWidget_, &MpvGLWidget::windowSizeSettingsRequested, this,
             &PlayerWindow::showWindowSizePresetsDialog);
+    connect(mpvWidget_, &MpvGLWidget::audioSyncSettingsRequested, this, &PlayerWindow::showAudioSyncDialog);
 
     auto *fullscreenShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);
     fullscreenShortcut->setContext(Qt::WindowShortcut);
@@ -632,6 +634,13 @@ void PlayerWindow::showWindowSizePresetsDialog() {
         windowSizePresets_ = dialog.values();
         saveWindowSizePresets(windowSizePresets_);
         mpvWidget_->setResizeMarginPx(windowSizePresets_.resizeMarginPx);
+    }
+}
+
+void PlayerWindow::showAudioSyncDialog() {
+    AudioSyncDialog dialog(mpvController_->audioDelayMs(), this);
+    if (dialog.exec() == QDialog::Accepted) {
+        mpvController_->setAudioDelayMs(dialog.valueMs());
     }
 }
 

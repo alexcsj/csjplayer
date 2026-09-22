@@ -87,6 +87,7 @@ private:
     void showMediaInfo();
     void showSeekStepSettingsDialog();
     void showWindowSizePresetsDialog();
+    void showAudioSyncDialog();
 
     // Z/X/C+Left/Right seek step size, falling back to the plain
     // Left/Right step when none of them are held. All sizes come from

@@ -65,6 +65,9 @@ signals:
     // Right-click menu's "調整視窗大小快捷鍵" action.
     void windowSizeSettingsRequested();
 
+    // Right-click menu's "調整音訊/視訊同步" action.
+    void audioSyncSettingsRequested();
+
 protected:
     void initializeGL() override;
     void paintGL() override;

@@ -67,6 +67,13 @@ public:
     void setLoopB();
     void clearLoop();
 
+    // Audio/video sync offset in milliseconds: positive delays audio
+    // relative to video, negative advances it (mpv's "audio-delay"
+    // property, which is in seconds -- converted here so callers deal in
+    // the ms unit the right-click "調整音訊/視訊同步" dialog exposes).
+    void setAudioDelayMs(int ms);
+    int audioDelayMs() const;
+
     // Synchronous query, safe to call anytime from the GUI thread.
     bool isPaused() const;
 

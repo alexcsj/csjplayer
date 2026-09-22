@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <clocale>
+#include <cmath>
 #include <cstdint>
 #include <stdexcept>
 
@@ -213,6 +214,19 @@ void MpvController::setPlayDirectionBackward(bool backward) {
     // in the future"); "play-direction" is the current name.
     checkError(mpv_set_property_string(mpv_, "play-direction", backward ? "backward" : "forward"),
                "set play-direction");
+}
+
+void MpvController::setAudioDelayMs(int ms) {
+    double seconds = ms / 1000.0;
+    checkError(mpv_set_property(mpv_, "audio-delay", MPV_FORMAT_DOUBLE, &seconds), "set audio-delay");
+}
+
+int MpvController::audioDelayMs() const {
+    double seconds = 0;
+    if (mpv_get_property(mpv_, "audio-delay", MPV_FORMAT_DOUBLE, &seconds) < 0) {
+        return 0;
+    }
+    return static_cast<int>(std::lround(seconds * 1000.0));
 }
 
 void MpvController::setLoopA() {

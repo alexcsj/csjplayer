@@ -29,6 +29,7 @@ set(SOURCES
     src/playback/PlaylistController.cpp
     src/playback/PlaylistScanner.cpp
     src/playback/SpeedController.cpp
+    src/ui/AudioSyncDialog.cpp
     src/ui/PlayerWindow.cpp
     src/ui/PlaylistModel.cpp
     src/ui/PlaylistPanel.cpp
