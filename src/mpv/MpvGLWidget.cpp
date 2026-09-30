@@ -272,6 +272,8 @@ void MpvGLWidget::contextMenuEvent(QContextMenuEvent *event) {
     connect(windowSizeAction, &QAction::triggered, this, &MpvGLWidget::windowSizeSettingsRequested);
     QAction *audioSyncAction = menu.addAction(QStringLiteral("調整音訊/視訊同步"));
     connect(audioSyncAction, &QAction::triggered, this, &MpvGLWidget::audioSyncSettingsRequested);
+    QAction *startupDefaultsAction = menu.addAction(QStringLiteral("預設畫面及音量"));
+    connect(startupDefaultsAction, &QAction::triggered, this, &MpvGLWidget::startupDefaultsSettingsRequested);
     menu.exec(event->globalPos());
 }
 

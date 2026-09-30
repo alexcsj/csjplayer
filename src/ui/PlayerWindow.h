@@ -3,6 +3,7 @@
 #include <QWidget>
 
 #include "ui/SeekStepSettingsDialog.h"
+#include "ui/StartupDefaultsDialog.h"
 #include "ui/WindowSizePresetsDialog.h"
 
 class MpvController;
@@ -88,6 +89,12 @@ private:
     void showSeekStepSettingsDialog();
     void showWindowSizePresetsDialog();
     void showAudioSyncDialog();
+    void showStartupDefaultsDialog();
+
+    // Resolves startupDefaults_.sizeMode/customWidth/customHeight (and, for
+    // preset modes, the current windowSizePresets_) into the actual size to
+    // resize() to at startup.
+    QSize startupWindowSize() const;
 
     // Z/X/C+Left/Right seek step size, falling back to the plain
     // Left/Right step when none of them are held. All sizes come from
@@ -118,4 +125,9 @@ private:
     // QSettings at startup and saved whenever changed via
     // showWindowSizePresetsDialog().
     WindowSizePresets windowSizePresets_;
+
+    // User-adjustable startup defaults (window size, volume, playlist panel
+    // visibility, repeat mode); loaded from QSettings at startup and saved
+    // whenever changed via showStartupDefaultsDialog().
+    StartupDefaults startupDefaults_;
 };

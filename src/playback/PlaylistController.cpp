@@ -169,6 +169,11 @@ void PlaylistController::cycleRepeatMode() {
     emit repeatModeChanged(repeatMode_);
 }
 
+void PlaylistController::setRepeatMode(RepeatMode mode) {
+    repeatMode_ = mode;
+    emit repeatModeChanged(repeatMode_);
+}
+
 void PlaylistController::onEndOfFile(bool eof) {
     if (!eof) {
         return;

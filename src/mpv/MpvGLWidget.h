@@ -68,6 +68,9 @@ signals:
     // Right-click menu's "調整音訊/視訊同步" action.
     void audioSyncSettingsRequested();
 
+    // Right-click menu's "預設畫面及音量" action.
+    void startupDefaultsSettingsRequested();
+
 protected:
     void initializeGL() override;
     void paintGL() override;

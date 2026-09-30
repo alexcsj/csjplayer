@@ -7,6 +7,7 @@
 #include "ui/PlaylistModel.h"
 #include "ui/PlaylistPanel.h"
 #include "ui/PlaylistView.h"
+#include "ui/StartupDefaultsDialog.h"
 #include "ui/TitleBar.h"
 #include "ui/TransportBar.h"
 #include "util/AudioSyncMuxer.h"
@@ -89,6 +90,37 @@ void saveWindowSizePresets(const WindowSizePresets &p) {
         settings.setValue(prefix + QStringLiteral("Height"), p.presets[i].height);
     }
     settings.setValue(QStringLiteral("resizeMarginPx"), p.resizeMarginPx);
+    settings.endGroup();
+}
+
+constexpr const char *kStartupDefaultsSettingsKey = "startup/defaults";
+
+StartupDefaults loadStartupDefaults() {
+    QSettings settings;
+    StartupDefaults result; // struct defaults double as the first-run values
+    settings.beginGroup(QLatin1String(kStartupDefaultsSettingsKey));
+    result.sizeMode = static_cast<StartupDefaults::SizeMode>(
+        settings.value(QStringLiteral("sizeMode"), static_cast<int>(result.sizeMode)).toInt());
+    result.customWidth = settings.value(QStringLiteral("customWidth"), result.customWidth).toInt();
+    result.customHeight = settings.value(QStringLiteral("customHeight"), result.customHeight).toInt();
+    result.volume = settings.value(QStringLiteral("volume"), result.volume).toInt();
+    result.playlistPanelVisible =
+        settings.value(QStringLiteral("playlistPanelVisible"), result.playlistPanelVisible).toBool();
+    result.repeatMode = static_cast<PlaylistController::RepeatMode>(
+        settings.value(QStringLiteral("repeatMode"), static_cast<int>(result.repeatMode)).toInt());
+    settings.endGroup();
+    return result;
+}
+
+void saveStartupDefaults(const StartupDefaults &d) {
+    QSettings settings;
+    settings.beginGroup(QLatin1String(kStartupDefaultsSettingsKey));
+    settings.setValue(QStringLiteral("sizeMode"), static_cast<int>(d.sizeMode));
+    settings.setValue(QStringLiteral("customWidth"), d.customWidth);
+    settings.setValue(QStringLiteral("customHeight"), d.customHeight);
+    settings.setValue(QStringLiteral("volume"), d.volume);
+    settings.setValue(QStringLiteral("playlistPanelVisible"), d.playlistPanelVisible);
+    settings.setValue(QStringLiteral("repeatMode"), static_cast<int>(d.repeatMode));
     settings.endGroup();
 }
 
@@ -258,11 +290,12 @@ constexpr const char *kTitleBarStyle = R"(
 
 PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     setWindowTitle(QStringLiteral("csjplayer"));
-    resize(960, 540);
     setAcceptDrops(true);
 
     seekStepSettings_ = loadSeekStepSettings();
     windowSizePresets_ = loadWindowSizePresets();
+    startupDefaults_ = loadStartupDefaults();
+    resizeToPreset(startupWindowSize());
 
     // Z/X/C held-state tracking for the seek-step shortcuts needs to see
     // every key press/release application-wide, not just ones delivered to
@@ -277,13 +310,14 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     setWindowFlag(Qt::FramelessWindowHint, true);
 
     mpvController_ = new MpvController(this);
+    mpvController_->setVolume(startupDefaults_.volume);
     mpvWidget_ = new MpvGLWidget(mpvController_, this);
     mpvWidget_->setResizeMarginPx(windowSizePresets_.resizeMarginPx);
     titleBar_ = new TitleBar(this);
     transportBar_ = new TransportBar(this);
     playlistController_ = new PlaylistController(mpvController_, this);
     playlistPanel_ = new PlaylistPanel(playlistController_->model(), this);
-    playlistPanel_->setVisible(false);
+    playlistPanel_->setVisible(startupDefaults_.playlistPanelVisible);
     playlistPanel_->setFixedWidth(280);
     speedController_ = new SpeedController(mpvController_, this);
 
@@ -348,6 +382,9 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(playlistController_, &PlaylistController::repeatModeChanged, this, [this](PlaylistController::RepeatMode) {
         updateRepeatModeLabel();
     });
+    // Applied here (after the wiring above) rather than at construction, so
+    // the repeatModeChanged signal it emits actually syncs the panel label.
+    playlistController_->setRepeatMode(startupDefaults_.repeatMode);
     connect(playlistPanel_->view(), &PlaylistView::playRequested, playlistController_, &PlaylistController::playIndex);
     connect(playlistPanel_->view(), &PlaylistView::removeRequested, this, [this](QList<int> rows) {
         // Remove highest index first so earlier indices in the batch stay valid.
@@ -491,6 +528,8 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(mpvWidget_, &MpvGLWidget::windowSizeSettingsRequested, this,
             &PlayerWindow::showWindowSizePresetsDialog);
     connect(mpvWidget_, &MpvGLWidget::audioSyncSettingsRequested, this, &PlayerWindow::showAudioSyncDialog);
+    connect(mpvWidget_, &MpvGLWidget::startupDefaultsSettingsRequested, this,
+            &PlayerWindow::showStartupDefaultsDialog);
 
     auto *fullscreenShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);
     fullscreenShortcut->setContext(Qt::WindowShortcut);
@@ -637,6 +676,23 @@ void PlayerWindow::showWindowSizePresetsDialog() {
         saveWindowSizePresets(windowSizePresets_);
         mpvWidget_->setResizeMarginPx(windowSizePresets_.resizeMarginPx);
     }
+}
+
+void PlayerWindow::showStartupDefaultsDialog() {
+    StartupDefaultsDialog dialog(startupDefaults_, windowSizePresets_, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        startupDefaults_ = dialog.values();
+        saveStartupDefaults(startupDefaults_);
+    }
+}
+
+QSize PlayerWindow::startupWindowSize() const {
+    if (startupDefaults_.sizeMode == StartupDefaults::SizeMode::Custom) {
+        return QSize(startupDefaults_.customWidth, startupDefaults_.customHeight);
+    }
+    const int index = static_cast<int>(startupDefaults_.sizeMode);
+    const WindowSizePreset &preset = windowSizePresets_.presets[index];
+    return QSize(preset.width, preset.height);
 }
 
 void PlayerWindow::showAudioSyncDialog() {

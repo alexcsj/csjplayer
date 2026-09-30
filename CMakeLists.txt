@@ -37,6 +37,7 @@ set(SOURCES
     src/ui/SeekBar.cpp
     src/ui/SeekStepSettingsDialog.cpp
     src/ui/SpeedControl.cpp
+    src/ui/StartupDefaultsDialog.cpp
     src/ui/TitleBar.cpp
     src/ui/TransportBar.cpp
     src/ui/VolumeControl.cpp

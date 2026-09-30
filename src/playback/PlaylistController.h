@@ -56,6 +56,10 @@ public slots:
     void playPrevious();
     void cycleRepeatMode();
 
+    // Sets the repeat mode directly (vs. cycleRepeatMode()'s fixed
+    // sequence) -- used to apply the user's configured startup default.
+    void setRepeatMode(RepeatMode mode);
+
 signals:
     void repeatModeChanged(RepeatMode mode);
     void currentIndexChanged(int row);
