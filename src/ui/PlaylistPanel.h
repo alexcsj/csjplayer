@@ -7,8 +7,8 @@ class PlaylistModel;
 class QPushButton;
 
 // Toggleable side panel: a small two-row toolbar (add file / add folder /
-// export list / import list / repeat mode cycle button) plus the playlist
-// list itself.
+// remove / hide-panel button on row 1, export list / import list / repeat
+// mode cycle button on row 2) plus the playlist list itself.
 class PlaylistPanel : public QWidget {
     Q_OBJECT
 
@@ -27,6 +27,11 @@ signals:
     void exportPlaylistRequested();
     void importPlaylistRequested();
 
+    // The panel's own "隱藏" button -- lets PlayerWindow collapse the panel
+    // without going through the TransportBar's "清單" toggle button or the
+    // right-click menu.
+    void hideRequested();
+
 private:
     PlaylistView *view_ = nullptr;
     QPushButton *openFilesButton_ = nullptr;
@@ -35,4 +40,5 @@ private:
     QPushButton *repeatButton_ = nullptr;
     QPushButton *exportButton_ = nullptr;
     QPushButton *importButton_ = nullptr;
+    QPushButton *hideButton_ = nullptr;
 };

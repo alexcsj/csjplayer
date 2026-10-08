@@ -365,10 +365,8 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     // Playlist wiring.
     connect(transportBar_, &TransportBar::previousClicked, playlistController_, &PlaylistController::playPrevious);
     connect(transportBar_, &TransportBar::nextClicked, playlistController_, &PlaylistController::playNext);
-    connect(transportBar_, &TransportBar::playlistToggleClicked, this, [this]() {
-        playlistPanel_->setVisible(!playlistPanel_->isVisible());
-        layoutOverlays();
-    });
+    connect(transportBar_, &TransportBar::playlistToggleClicked, this, &PlayerWindow::togglePlaylistPanel);
+    connect(playlistPanel_, &PlaylistPanel::hideRequested, this, &PlayerWindow::togglePlaylistPanel);
     connect(transportBar_, &TransportBar::openFilesClicked, this, &PlayerWindow::quickOpenFilesDialog);
     connect(playlistController_, &PlaylistController::currentIndexChanged, this,
             [this](int) { transportBar_->setPlaylistNavigationEnabled(true); });
@@ -530,6 +528,8 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(mpvWidget_, &MpvGLWidget::audioSyncSettingsRequested, this, &PlayerWindow::showAudioSyncDialog);
     connect(mpvWidget_, &MpvGLWidget::startupDefaultsSettingsRequested, this,
             &PlayerWindow::showStartupDefaultsDialog);
+    connect(mpvWidget_, &MpvGLWidget::playlistPanelToggleRequested, this, &PlayerWindow::togglePlaylistPanel);
+    connect(mpvWidget_, &MpvGLWidget::quitRequested, this, &QWidget::close);
 
     auto *fullscreenShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);
     fullscreenShortcut->setContext(Qt::WindowShortcut);
@@ -693,6 +693,11 @@ QSize PlayerWindow::startupWindowSize() const {
     const int index = static_cast<int>(startupDefaults_.sizeMode);
     const WindowSizePreset &preset = windowSizePresets_.presets[index];
     return QSize(preset.width, preset.height);
+}
+
+void PlayerWindow::togglePlaylistPanel() {
+    playlistPanel_->setVisible(!playlistPanel_->isVisible());
+    layoutOverlays();
 }
 
 void PlayerWindow::showAudioSyncDialog() {

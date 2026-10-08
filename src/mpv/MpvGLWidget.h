@@ -71,6 +71,12 @@ signals:
     // Right-click menu's "預設畫面及音量" action.
     void startupDefaultsSettingsRequested();
 
+    // Right-click menu's "顯示/隱藏播放清單面板" action.
+    void playlistPanelToggleRequested();
+
+    // Right-click menu's "關閉程式" action.
+    void quitRequested();
+
 protected:
     void initializeGL() override;
     void paintGL() override;

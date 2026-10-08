@@ -91,6 +91,10 @@ private:
     void showAudioSyncDialog();
     void showStartupDefaultsDialog();
 
+    // Shared by the TransportBar "清單" button, the playlist panel's own
+    // "隱藏" button, and the right-click menu's "顯示/隱藏播放清單面板" item.
+    void togglePlaylistPanel();
+
     // Resolves startupDefaults_.sizeMode/customWidth/customHeight (and, for
     // preset modes, the current windowSizePresets_) into the actual size to
     // resize() to at startup.
