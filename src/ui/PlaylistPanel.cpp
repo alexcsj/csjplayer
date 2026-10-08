@@ -19,15 +19,11 @@ PlaylistPanel::PlaylistPanel(PlaylistModel *model, QWidget *parent) : QWidget(pa
     exportButton_ = new QPushButton(QStringLiteral("匯出清單"), this);
     importButton_ = new QPushButton(QStringLiteral("匯入清單"), this);
     repeatButton_ = new QPushButton(QStringLiteral("不循環"), this);
-    hideButton_ = new QPushButton(QStringLiteral("✕"), this);
-    hideButton_->setToolTip(QStringLiteral("隱藏所有面板"));
 
     auto *toolbarRow1 = new QHBoxLayout();
     toolbarRow1->addWidget(openFilesButton_);
     toolbarRow1->addWidget(openFolderButton_);
     toolbarRow1->addWidget(removeButton_);
-    toolbarRow1->addStretch(1);
-    toolbarRow1->addWidget(hideButton_);
 
     auto *toolbarRow2 = new QHBoxLayout();
     toolbarRow2->addWidget(exportButton_);
@@ -45,7 +41,6 @@ PlaylistPanel::PlaylistPanel(PlaylistModel *model, QWidget *parent) : QWidget(pa
     connect(repeatButton_, &QPushButton::clicked, this, &PlaylistPanel::repeatToggleRequested);
     connect(exportButton_, &QPushButton::clicked, this, &PlaylistPanel::exportPlaylistRequested);
     connect(importButton_, &QPushButton::clicked, this, &PlaylistPanel::importPlaylistRequested);
-    connect(hideButton_, &QPushButton::clicked, this, &PlaylistPanel::hideRequested);
 }
 
 void PlaylistPanel::setRepeatModeLabel(const QString &text) {

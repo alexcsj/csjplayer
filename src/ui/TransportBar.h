@@ -11,7 +11,7 @@ class VolumeControl;
 class SpeedControl;
 
 // Play/pause, prev/next, seek bar, time labels, volume/mute, speed/
-// direction, and the playlist-panel toggle.
+// direction, the playlist-panel toggle, and the hide-all-panels button.
 class TransportBar : public QWidget {
     Q_OBJECT
 
@@ -35,6 +35,7 @@ signals:
     void previousClicked();
     void nextClicked();
     void playlistToggleClicked();
+    void chromeToggleClicked();
     void openFilesClicked();
     void muteToggleClicked();
     void speedMagnitudeSelected(double magnitude);
@@ -48,6 +49,7 @@ private:
     QPushButton *nextButton_ = nullptr;
     QPushButton *openFilesButton_ = nullptr;
     QPushButton *playlistToggleButton_ = nullptr;
+    QPushButton *chromeToggleButton_ = nullptr;
     SeekBar *seekBar_ = nullptr;
     VolumeControl *volumeControl_ = nullptr;
     SpeedControl *speedControl_ = nullptr;

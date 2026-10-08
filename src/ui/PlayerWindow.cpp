@@ -366,9 +366,7 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(transportBar_, &TransportBar::previousClicked, playlistController_, &PlaylistController::playPrevious);
     connect(transportBar_, &TransportBar::nextClicked, playlistController_, &PlaylistController::playNext);
     connect(transportBar_, &TransportBar::playlistToggleClicked, this, &PlayerWindow::togglePlaylistPanel);
-    // The panel's own hide button hides everything (same as Ctrl+/), not
-    // just itself -- that's what was actually asked for.
-    connect(playlistPanel_, &PlaylistPanel::hideRequested, this, &PlayerWindow::toggleChromeHidden);
+    connect(transportBar_, &TransportBar::chromeToggleClicked, this, &PlayerWindow::toggleChromeHidden);
     connect(transportBar_, &TransportBar::openFilesClicked, this, &PlayerWindow::quickOpenFilesDialog);
     connect(playlistController_, &PlaylistController::currentIndexChanged, this,
             [this](int) { transportBar_->setPlaylistNavigationEnabled(true); });

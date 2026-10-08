@@ -19,6 +19,8 @@ TransportBar::TransportBar(QWidget *parent) : QWidget(parent) {
     openFilesButton_ = new QPushButton(QStringLiteral("⏏"), this); // triangle-over-bar "open" glyph
     openFilesButton_->setToolTip(QStringLiteral("開啟檔案"));
     playlistToggleButton_ = new QPushButton(QStringLiteral("清單"), this);
+    chromeToggleButton_ = new QPushButton(QStringLiteral("✕"), this);
+    chromeToggleButton_->setToolTip(QStringLiteral("隱藏/顯示所有面板"));
 
     // Nothing to skip to until the playlist has at least one entry.
     prevButton_->setEnabled(false);
@@ -50,6 +52,7 @@ TransportBar::TransportBar(QWidget *parent) : QWidget(parent) {
     layout->addWidget(volumeControl_);
     layout->addWidget(openFilesButton_);
     layout->addWidget(playlistToggleButton_);
+    layout->addWidget(chromeToggleButton_);
 
     connect(playPauseButton_, &QPushButton::clicked, this, &TransportBar::playPauseClicked);
     connect(seekBar_, &SeekBar::seekRequested, this, &TransportBar::seekRequested);
@@ -57,6 +60,7 @@ TransportBar::TransportBar(QWidget *parent) : QWidget(parent) {
     connect(nextButton_, &QPushButton::clicked, this, &TransportBar::nextClicked);
     connect(openFilesButton_, &QPushButton::clicked, this, &TransportBar::openFilesClicked);
     connect(playlistToggleButton_, &QPushButton::clicked, this, &TransportBar::playlistToggleClicked);
+    connect(chromeToggleButton_, &QPushButton::clicked, this, &TransportBar::chromeToggleClicked);
     connect(volumeControl_, &VolumeControl::muteToggleClicked, this, &TransportBar::muteToggleClicked);
     connect(speedControl_, &SpeedControl::magnitudeSelected, this, &TransportBar::speedMagnitudeSelected);
     connect(speedControl_, &SpeedControl::directionToggleClicked, this, &TransportBar::speedDirectionToggleClicked);
