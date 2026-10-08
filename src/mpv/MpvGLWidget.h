@@ -71,8 +71,8 @@ signals:
     // Right-click menu's "預設畫面及音量" action.
     void startupDefaultsSettingsRequested();
 
-    // Right-click menu's "顯示/隱藏播放清單面板" action.
-    void playlistPanelToggleRequested();
+    // Right-click menu's "顯示/隱藏所有面板" action (same effect as Ctrl+/).
+    void chromeToggleRequested();
 
     // Right-click menu's "關閉程式" action.
     void quitRequested();

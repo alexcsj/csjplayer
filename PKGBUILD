@@ -1,6 +1,6 @@
 # Maintainer: csj <csj.taiwan@gmail.com>
 pkgname=csjplayer
-pkgver=0.7.0
+pkgver=0.8.0
 pkgrel=1
 pkgdesc="A custom FFmpeg (libmpv)-based media player with playlist, A-B loop, variable speed and reverse playback"
 arch=('x86_64')

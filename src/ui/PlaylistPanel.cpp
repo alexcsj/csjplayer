@@ -20,7 +20,7 @@ PlaylistPanel::PlaylistPanel(PlaylistModel *model, QWidget *parent) : QWidget(pa
     importButton_ = new QPushButton(QStringLiteral("匯入清單"), this);
     repeatButton_ = new QPushButton(QStringLiteral("不循環"), this);
     hideButton_ = new QPushButton(QStringLiteral("✕"), this);
-    hideButton_->setToolTip(QStringLiteral("隱藏播放清單面板"));
+    hideButton_->setToolTip(QStringLiteral("隱藏所有面板"));
 
     auto *toolbarRow1 = new QHBoxLayout();
     toolbarRow1->addWidget(openFilesButton_);

@@ -366,7 +366,9 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(transportBar_, &TransportBar::previousClicked, playlistController_, &PlaylistController::playPrevious);
     connect(transportBar_, &TransportBar::nextClicked, playlistController_, &PlaylistController::playNext);
     connect(transportBar_, &TransportBar::playlistToggleClicked, this, &PlayerWindow::togglePlaylistPanel);
-    connect(playlistPanel_, &PlaylistPanel::hideRequested, this, &PlayerWindow::togglePlaylistPanel);
+    // The panel's own hide button hides everything (same as Ctrl+/), not
+    // just itself -- that's what was actually asked for.
+    connect(playlistPanel_, &PlaylistPanel::hideRequested, this, &PlayerWindow::toggleChromeHidden);
     connect(transportBar_, &TransportBar::openFilesClicked, this, &PlayerWindow::quickOpenFilesDialog);
     connect(playlistController_, &PlaylistController::currentIndexChanged, this,
             [this](int) { transportBar_->setPlaylistNavigationEnabled(true); });
@@ -528,7 +530,7 @@ PlayerWindow::PlayerWindow(QWidget *parent) : QWidget(parent) {
     connect(mpvWidget_, &MpvGLWidget::audioSyncSettingsRequested, this, &PlayerWindow::showAudioSyncDialog);
     connect(mpvWidget_, &MpvGLWidget::startupDefaultsSettingsRequested, this,
             &PlayerWindow::showStartupDefaultsDialog);
-    connect(mpvWidget_, &MpvGLWidget::playlistPanelToggleRequested, this, &PlayerWindow::togglePlaylistPanel);
+    connect(mpvWidget_, &MpvGLWidget::chromeToggleRequested, this, &PlayerWindow::toggleChromeHidden);
     connect(mpvWidget_, &MpvGLWidget::quitRequested, this, &QWidget::close);
 
     auto *fullscreenShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);

@@ -274,8 +274,8 @@ void MpvGLWidget::contextMenuEvent(QContextMenuEvent *event) {
     connect(audioSyncAction, &QAction::triggered, this, &MpvGLWidget::audioSyncSettingsRequested);
     QAction *startupDefaultsAction = menu.addAction(QStringLiteral("預設畫面及音量"));
     connect(startupDefaultsAction, &QAction::triggered, this, &MpvGLWidget::startupDefaultsSettingsRequested);
-    QAction *playlistPanelAction = menu.addAction(QStringLiteral("顯示/隱藏播放清單面板"));
-    connect(playlistPanelAction, &QAction::triggered, this, &MpvGLWidget::playlistPanelToggleRequested);
+    QAction *chromeToggleAction = menu.addAction(QStringLiteral("顯示/隱藏所有面板"));
+    connect(chromeToggleAction, &QAction::triggered, this, &MpvGLWidget::chromeToggleRequested);
     menu.addSeparator();
     QAction *quitAction = menu.addAction(QStringLiteral("關閉程式"));
     connect(quitAction, &QAction::triggered, this, &MpvGLWidget::quitRequested);
